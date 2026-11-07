@@ -61,6 +61,11 @@ def main():
     run([PY, "find_pages.py", soffice(os.path.join(ROOT, report), "pdf", tmp), toc, pages])
     run([PY, "build_report.py", pages])
 
+    # принципиальная гидравлическая схема (лист A3 + перечень, слайд 5а); нужна до документа дополнения
+    run([PY, "build_scheme.py"], cwd=add)
+    slide5a = os.path.join(add, "Слайд_5а_гидравлическая_схема.pptx")
+    shutil.copyfile(soffice(slide5a, "pdf", tmp), os.path.splitext(slide5a)[0] + ".pdf")
+
     run([PY, "build_addendum_docx.py"], cwd=add)
     print("Готово.")
 
