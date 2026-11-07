@@ -1,0 +1,522 @@
+<title>Симулятор карьерного водоотлива</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Раскладка: пульт сверху, ниже — разрез накопителя слева и графики справа; на телефоне всё в одну колонку */
+:root {
+  --bg: #F4F6F6;
+  --panel: #FFFFFF;
+  --ink: #1F2A33;
+  --muted: #5F6B73;
+  --line: #D5DDDF;
+  --water: #0E7C86;
+  --water-soft: #CFE6E8;
+  --amber: #E89F00;
+  --danger: #C0392B;
+  --ok: #2E7D4F;
+  --sludge: #5B4A3A;
+  --dead: #9AA6AB;
+  --free: #FFFFFF;
+  --chip: #EAF1F2;
+  --font-body: "Golos Text", "Segoe UI", Arial, sans-serif;
+  --font-num: "JetBrains Mono", Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12191E; --panel: #1A242B; --ink: #E6ECEE; --muted: #9AA8AE; --line: #2D3A42;
+    --water: #2BB3BF; --water-soft: #1E4A50; --amber: #F2B53A; --danger: #FF6B5B; --ok: #5CC28A;
+    --sludge: #7A6450; --dead: #56646B; --free: #1A242B; --chip: #22313A; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12191E; --panel: #1A242B; --ink: #E6ECEE; --muted: #9AA8AE; --line: #2D3A42;
+  --water: #2BB3BF; --water-soft: #1E4A50; --amber: #F2B53A; --danger: #FF6B5B; --ok: #5CC28A;
+  --sludge: #7A6450; --dead: #56646B; --free: #1A242B; --chip: #22313A; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 32px;
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 16px; }
+header { display: grid; gap: 4px; }
+.eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-size: clamp(24px, 3.4vw, 34px); line-height: 1.1; margin: 0; text-wrap: balance; font-weight: 700; }
+.lead { color: var(--muted); max-width: 70ch; margin: 0; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+h2 { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+.controls { display: grid; gap: 14px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.seg button, .preset {
+  font: inherit; color: var(--ink); background: var(--chip); border: 1px solid var(--line); border-radius: 8px;
+  cursor: pointer; text-align: left;
+}
+.seg button { padding: 8px 10px; display: grid; gap: 2px; }
+.seg button b { font-size: 18px; }
+.seg button span { font-size: 12px; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--water); border-color: var(--water); color: #fff; }
+.seg button[aria-pressed="true"] span { color: #E6F4F5; }
+.preset { padding: 6px 12px; font-size: 13px; }
+.preset[aria-pressed="true"] { border-color: var(--water); box-shadow: inset 0 0 0 1px var(--water); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.sliders { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 20px; }
+.sl { display: grid; gap: 2px; min-width: 0; }
+.sl label { font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+.sl output { font-family: var(--font-num); color: var(--ink); font-size: 13px; white-space: nowrap; }
+input[type=range] { width: 100%; accent-color: var(--water); }
+.checks { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 14px; }
+.checks label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+.main { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 860px) { .main { grid-template-columns: minmax(0, 1fr); } .seg { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.tankbox { display: grid; gap: 12px; }
+svg text { font-family: var(--font-body); }
+.clock { display: flex; align-items: center; gap: 10px; }
+.clock button { font: inherit; background: var(--water); color: #fff; border: 0; border-radius: 8px; padding: 6px 14px; cursor: pointer; white-space: nowrap; flex: none; }
+.clock input { flex: 1; min-width: 0; }
+.clock output { font-family: var(--font-num); font-size: 14px; white-space: nowrap; }
+.pumps { display: flex; flex-wrap: wrap; gap: 6px; }
+.pump { font-size: 12px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--chip); }
+.pump.run { background: var(--water); border-color: var(--water); color: #fff; }
+.pump.fail { background: transparent; border-color: var(--danger); color: var(--danger); }
+.pump.off { opacity: .7; }
+.now { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; font-size: 13px; }
+.now div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px dashed var(--line); padding-bottom: 2px; }
+.now b { font-family: var(--font-num); font-weight: 600; }
+.charts { display: grid; gap: 12px; min-width: 0; }
+canvas { width: 100%; display: block; }
+.verdicts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
+.v { border-radius: 8px; padding: 8px 10px; background: var(--chip); border: 1px solid var(--line); display: grid; gap: 2px; }
+.v .k { font-size: 12px; color: var(--muted); }
+.v .x { font-family: var(--font-num); font-size: 18px; font-weight: 600; }
+.v.good { border-color: var(--ok); } .v.good .x { color: var(--ok); }
+.v.bad { border-color: var(--danger); } .v.bad .x { color: var(--danger); }
+.v.warn { border-color: var(--amber); } .v.warn .x { color: var(--amber); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 4px; }
+.notes { font-size: 13px; color: var(--muted); display: grid; gap: 6px; }
+.notes p { margin: 0; max-width: 95ch; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Кейс СУЭК · Восточно-Бейский разрез · учебная модель</div>
+    <h1>Симулятор карьерного водоотлива</h1>
+    <p class="lead">Выберите насосную, задайте приток и аварию — модель по часам покажет уровень в накопителе, работу насосов и выполнение требований кейса.</p>
+  </header>
+
+  <section class="panel controls" aria-label="Пульт">
+    <div>
+      <h2>Конфигурация насосной</h2>
+      <div class="seg" id="cfg"></div>
+    </div>
+    <div>
+      <h2>Готовые сценарии</h2>
+      <div class="row" id="presets"></div>
+    </div>
+    <div class="sliders">
+      <div class="sl"><label for="q">Средний приток <output id="qo"></output></label><input id="q" type="range" min="300" max="1500" step="10"></div>
+      <div class="sl"><label for="pk">Суточный пик, × от среднего <output id="pko"></output></label><input id="pk" type="range" min="1" max="1.4" step="0.05"></div>
+      <div class="sl"><label for="ot">Полный отказ откачки, ч <output id="oto"></output></label><input id="ot" type="range" min="0" max="6" step="0.5"></div>
+      <div class="sl"><label for="t0">Час начала события <output id="t0o"></output></label><input id="t0" type="range" min="1" max="24" step="1"></div>
+      <div class="sl"><label for="rep">Ремонт отказавшего P2, ч <output id="repo"></output></label><input id="rep" type="range" min="1" max="24" step="1"></div>
+      <div class="sl"><label for="vu">Полезный объём, м³ <output id="vuo"></output></label><input id="vu" type="range" min="1000" max="4000" step="100"></div>
+    </div>
+    <div class="checks">
+      <label><input id="pkon" type="checkbox"> Суточный пик (6 ч)</label>
+      <label><input id="uf" type="checkbox"> Отказ рабочего насоса P2</label>
+      <label><input id="s2" type="checkbox"> Вторая секция отстойника (предел 3000 м³/ч)</label>
+    </div>
+  </section>
+
+  <section class="main">
+    <div class="panel tankbox">
+      <h2>Накопитель в разрезе</h2>
+      <svg id="tank" viewBox="0 0 300 380" role="img" aria-label="Уровень воды в накопителе"></svg>
+      <div class="clock">
+        <button id="play" type="button">▶ Пуск</button>
+        <input id="hr" type="range" min="1" max="48" step="1" aria-label="Час моделирования">
+        <output id="hro"></output>
+      </div>
+      <div class="pumps" id="pumps"></div>
+      <div class="now" id="now"></div>
+    </div>
+    <div class="panel charts">
+      <h2>Двое суток по часам</h2>
+      <div class="legend">
+        <span><i style="background:var(--ink)"></i>Приток</span>
+        <span><i style="background:var(--water)"></i>Откачка</span>
+        <span><i style="background:var(--amber)"></i>Предел отстойника</span>
+      </div>
+      <canvas id="cf" height="150" aria-label="График притока и откачки"></canvas>
+      <div class="legend">
+        <span><i style="background:var(--water)"></i>Объём в накопителе</span>
+        <span><i style="background:var(--danger)"></i>Полезный объём</span>
+        <span><i style="background:var(--muted)"></i>Край (с бортом)</span>
+      </div>
+      <canvas id="cv" height="210" aria-label="График объёма в накопителе"></canvas>
+      <div class="verdicts" id="verd"></div>
+    </div>
+  </section>
+
+  <section class="panel notes">
+    <h2>Как считает модель</h2>
+    <p>Насосы: H = H₀ − a·q² (P1: 130 − 0,00008·q², P2: 165 − 0,00006·q²), сеть: H = 60 + 0,000025·Q². Для любого набора насосов общий напор подбирается так, чтобы сумма подач при этом напоре равнялась расходу сети. Наборы с подачей выше предела отстойника не используются.</p>
+    <p>Шаг — 1 час. Базовая ступень — самый экономичный набор с подачей не меньше среднего притока; при объёме выше порога 500 м³ включается самый мощный допустимый набор. Откачано = min(подача, объём + приток). Старт — с пустого полезного объёма. Полный объём = (полезный + 400 осадка + 200 недоступного) / 0,85.</p>
+    <p>Данные — единые учебные условия кейса, не измерения разреза. Расчёт совпадает с книгами «Расчёт_водоотлив.xlsx» и «Дополнение_расчёты.xlsx».</p>
+    <p>Объект: ООО «Восточно-Бейский разрез» (СУЭК), Бейское месторождение, Бейский район Республики Хакасия; добыча 3,5–3,7 млн т/год. С 2018 года на разрезе работают очистные карьерных вод — 350 м³/ч с перспективой до 670 м³/ч (двухступенчатая фильтрация и УФ); на территории разреза строится обогатительная фабрика 750 т/ч — потребитель повторной воды. Источники: r-19.ru и РИА Новости (29.08.2018), Neftegaz.RU (04.08.2023), energybase.ru.</p>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var PUMP = { P1: { H0: 130, a: 8e-5, qmin: 200, qmax: 1000, eta: 0.75 }, P2: { H0: 165, a: 6e-5, qmin: 250, qmax: 1200, eta: 0.8 } };
+  var HST = 60, K = 2.5e-5, VSL = 400, VDEAD = 200, KFB = 0.15, L2 = 500, HOURS = 48;
+  var CFG = {
+    A: { n1: 0, n2: 2, title: "2 × P2", sub: "1 рабочий + 1 резерв" },
+    B: { n1: 3, n2: 0, title: "3 × P1", sub: "2 рабочих + 1 резерв" },
+    C: { n1: 1, n2: 1, title: "P2 + P1", sub: "P1 — резерв" },
+    D: { n1: 1, n2: 2, title: "2 × P2 + P1", sub: "усиленный резерв" }
+  };
+  var PRESETS = [
+    { id: "peak", name: "Сутки с пиком", s: { q: 1000, pk: 1.2, pkon: true, ot: 0, t0: 1, uf: false } },
+    { id: "fail", name: "Отказ 2 ч (кейс)", s: { q: 1000, pk: 1.2, pkon: false, ot: 2, t0: 1, uf: false } },
+    { id: "failpk", name: "Отказ в начале пика", s: { q: 1000, pk: 1.2, pkon: true, ot: 2, t0: 1, uf: false } },
+    { id: "unit", name: "Отказ насоса P2", s: { q: 1000, pk: 1.2, pkon: true, ot: 0, t0: 1, uf: true, rep: 7 } },
+    { id: "grow", name: "Приток +10 % и отказ", s: { q: 1100, pk: 1.2, pkon: false, ot: 2, t0: 1, uf: false } },
+    { id: "now", name: "Сегодня: 450 м³/ч", s: { q: 450, pk: 1.2, pkon: false, ot: 0, t0: 1, uf: false } }
+  ];
+  var st = { cfg: "A", q: 1000, pk: 1.2, pkon: false, ot: 2, t0: 1, uf: false, rep: 7, vu: 2500, s2: false, hr: 1, preset: "fail" };
+  var $ = function (id) { return document.getElementById(id); };
+  var fmt = function (x, d) { return (x).toLocaleString("ru-RU", { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 }); };
+
+  // ---------- насосы
+  var cache = {};
+  function point(n1, n2) {
+    var key = n1 + ":" + n2;
+    if (cache[key]) return cache[key];
+    var r = { n1: n1, n2: n2, Q: 0, H: 0, e: 0, kw: 0, q1: 0, q2: 0, ok: true };
+    if (n1 + n2 > 0) {
+      var lo = HST, hi = n2 > 0 ? PUMP.P2.H0 : PUMP.P1.H0, H = lo;
+      var qp = function (p, h) { return Math.sqrt(Math.max(0, (PUMP[p].H0 - h) / PUMP[p].a)); };
+      for (var i = 0; i < 60; i++) {
+        H = (lo + hi) / 2;
+        var f = n2 * qp("P2", H) + n1 * qp("P1", H) - Math.sqrt((H - HST) / K);
+        if (f > 0) lo = H; else hi = H;
+      }
+      r.H = H; r.q2 = qp("P2", H); r.q1 = qp("P1", H); r.Q = n2 * r.q2 + n1 * r.q1;
+      r.kw = 1000 * 9.81 * H * (n2 * r.q2 / PUMP.P2.eta + n1 * r.q1 / PUMP.P1.eta) / 3600 / 1000;
+      r.e = r.kw / r.Q;
+      if (n2 && (r.q2 < PUMP.P2.qmin || r.q2 > PUMP.P2.qmax)) r.ok = false;
+      if (n1 && (r.q1 < PUMP.P1.qmin || r.q1 > PUMP.P1.qmax)) r.ok = false;
+    }
+    cache[key] = r;
+    return r;
+  }
+  function stages(a1, a2, meanQ, slim) {
+    var list = [];
+    for (var i = 0; i <= a1; i++) for (var j = 0; j <= a2; j++) {
+      if (i + j === 0) continue;
+      var p = point(i, j);
+      if (p.ok && p.Q <= slim) list.push(p);
+    }
+    if (!list.length) return null;
+    var enough = list.filter(function (p) { return p.Q >= meanQ; });
+    var base = enough.length ? enough.reduce(function (b, p) { return p.e < b.e ? p : b; })
+                             : list.reduce(function (b, p) { return p.Q > b.Q ? p : b; });
+    var high = list.reduce(function (b, p) { return p.Q > b.Q ? p : b; });
+    if (high.Q < base.Q) high = base;
+    return { base: base, high: high };
+  }
+
+  // ---------- модель
+  function simulate() {
+    var c = CFG[st.cfg], slim = st.s2 ? 3000 : 1500;
+    var pk = st.pkon ? st.pk : 1, off = (24 - 6 * pk) / 18;
+    var vfull = (st.vu + VSL + VDEAD) / (1 - KFB), vfb = vfull * KFB;
+    var V = 0, rows = [], evEnd = 0;
+    var uf2 = st.uf && c.n2 > 0, uf1 = st.uf && c.n2 === 0;
+    if (st.ot > 0) evEnd = Math.max(evEnd, st.t0 + st.ot - 1);
+    if (st.uf) evEnd = Math.max(evEnd, st.t0 + st.rep - 1);
+    for (var h = 1; h <= HOURS; h++) {
+      var inflow = st.pkon ? (((h - 1) % 24) < 6 ? st.q * pk : st.q * off) : st.q;
+      var outFrac = 0;
+      if (st.ot > 0 && h >= st.t0 && h < st.t0 + st.ot) outFrac = Math.min(1, st.t0 + st.ot - h);
+      var unitDown = st.uf && h >= st.t0 && h < st.t0 + st.rep;
+      var a1 = c.n1 - (unitDown && uf1 ? 1 : 0), a2 = c.n2 - (unitDown && uf2 ? 1 : 0);
+      var sg = stages(a1, a2, st.q, slim);
+      var stg = null, cap = 0;
+      if (sg && outFrac < 1) { stg = V >= L2 ? sg.high : sg.base; cap = stg.Q * (1 - outFrac); }
+      var pumped = Math.min(cap, V + inflow);
+      var v0 = V;
+      V = V + inflow - pumped;
+      rows.push({ h: h, inflow: inflow, cap: cap, pumped: pumped, v0: v0, v: V, stg: stg, outFrac: outFrac,
+        unitDown: unitDown, kwh: stg ? pumped * stg.e : 0, a1: a1, a2: a2, slim: slim });
+    }
+    var vmax = 0, firstOver = null, spill = null, ret = null;
+    rows.forEach(function (r) {
+      if (r.v > vmax) vmax = r.v;
+      if (firstOver === null && r.v > st.vu + 0.01) firstOver = r.h;
+      if (spill === null && r.v > st.vu + vfb + 0.01) spill = r.h;
+      if (ret === null && r.h > evEnd && r.v <= 0.01) ret = r.h;
+    });
+    var day1 = rows.slice(0, 24).reduce(function (s, r) { return s + r.kwh; }, 0);
+    return { rows: rows, vmax: vmax, firstOver: firstOver, spill: spill, ret: ret, evEnd: evEnd, vfull: vfull,
+      vfb: vfb, kwh: day1, slim: slim, noStage: !stages(c.n1, c.n2, st.q, slim) };
+  }
+
+  // ---------- интерфейс
+  function buildControls() {
+    var cfgBox = $("cfg");
+    Object.keys(CFG).forEach(function (k) {
+      var b = document.createElement("button");
+      b.type = "button"; b.id = "cfg-" + k;
+      b.innerHTML = "<b>" + k + " · " + CFG[k].title + "</b><span>" + CFG[k].sub + "</span>";
+      b.addEventListener("click", function () { st.cfg = k; render(); });
+      cfgBox.appendChild(b);
+    });
+    var pr = $("presets");
+    PRESETS.forEach(function (p) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "preset"; b.id = "pr-" + p.id; b.textContent = p.name;
+      b.addEventListener("click", function () {
+        Object.keys(p.s).forEach(function (k) { st[k] = p.s[k]; });
+        st.preset = p.id; st.hr = 1; syncInputs(); render();
+      });
+      pr.appendChild(b);
+    });
+    [["q", "q"], ["pk", "pk"], ["ot", "ot"], ["t0", "t0"], ["rep", "rep"], ["vu", "vu"]].forEach(function (x) {
+      $(x[0]).addEventListener("input", function (ev) { st[x[1]] = parseFloat(ev.target.value); st.preset = null; render(); });
+    });
+    [["pkon", "pkon"], ["uf", "uf"], ["s2", "s2"]].forEach(function (x) {
+      $(x[0]).addEventListener("change", function (ev) { st[x[1]] = ev.target.checked; st.preset = null; render(); });
+    });
+    $("hr").addEventListener("input", function (ev) { st.hr = parseInt(ev.target.value, 10); stop(); renderHour(); });
+    $("play").addEventListener("click", function () { timer ? stop() : play(); });
+  }
+  function syncInputs() {
+    ["q", "pk", "ot", "t0", "rep", "vu"].forEach(function (k) { $(k).value = st[k]; });
+    $("pkon").checked = st.pkon; $("uf").checked = st.uf; $("s2").checked = st.s2; $("hr").value = st.hr;
+  }
+
+  var res = null, timer = null;
+  function play() {
+    if (st.hr >= HOURS) st.hr = 1;
+    $("play").textContent = "❚❚ Пауза";
+    var step = function () {
+      st.hr++; $("hr").value = st.hr; renderHour();
+      if (st.hr >= HOURS) stop();
+    };
+    timer = setInterval(step, window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 400 : 180);
+  }
+  function stop() { if (timer) clearInterval(timer); timer = null; $("play").textContent = "▶ Пуск"; }
+
+  function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  function render() {
+    $("qo").textContent = fmt(st.q) + " м³/ч";
+    $("pko").textContent = st.pkon ? "× " + fmt(st.pk, 2) : "выкл.";
+    $("oto").textContent = st.ot ? fmt(st.ot, 1) + " ч" : "нет";
+    $("t0o").textContent = st.t0 + "-й";
+    $("repo").textContent = st.uf ? st.rep + " ч" : "выкл.";
+    $("vuo").textContent = fmt(st.vu) + " м³";
+    $("pk").disabled = !st.pkon; $("rep").disabled = !st.uf;
+    Object.keys(CFG).forEach(function (k) { $("cfg-" + k).setAttribute("aria-pressed", String(st.cfg === k)); });
+    PRESETS.forEach(function (p) { $("pr-" + p.id).setAttribute("aria-pressed", String(st.preset === p.id)); });
+    res = simulate();
+    drawCharts();
+    verdicts();
+    renderHour();
+  }
+
+  function verdicts() {
+    var r = res, out = [];
+    var pct = r.vmax / st.vu * 100;
+    out.push({ k: "Максимальный объём", x: fmt(r.vmax) + " м³", c: pct > 100 ? "bad" : (pct > 85 ? "warn" : "good"),
+      sub: fmt(pct) + " % полезного" });
+    out.push({ k: "Полезный объём", x: r.firstOver ? "превышен" : "в пределах", c: r.firstOver ? "bad" : "good",
+      sub: r.firstOver ? "с " + r.firstOver + "-го часа" : "весь приток принят" });
+    out.push({ k: "Перелив через край", x: r.spill ? "ЕСТЬ" : "нет", c: r.spill ? "bad" : "good",
+      sub: r.spill ? "с " + r.spill + "-го часа" : "борт не исчерпан" });
+    var hasEvent = st.ot > 0 || st.uf;
+    var recH = r.ret !== null ? r.ret - (hasEvent ? r.evEnd : 0) : null;
+    var recOk = r.ret !== null && (hasEvent ? recH <= 24 : r.ret <= 24);
+    out.push({ k: hasEvent ? "Восстановление после события" : "Возврат к пустому объёму",
+      x: r.ret === null ? "нет за 48 ч" : (hasEvent ? fmt(recH) + " ч" : r.ret + "-й час"), c: recOk ? "good" : "bad",
+      sub: hasEvent ? "норма кейса ≤ 24 ч" : "норма — до конца суток" });
+    out.push({ k: "Энергия за первые сутки", x: fmt(r.kwh) + " кВт·ч", c: "", sub: "≈ " + fmt(r.kwh * 7 / 1000, 1) + " тыс. руб. по 7 руб./кВт·ч" });
+    $("verd").innerHTML = out.map(function (o) {
+      return '<div class="v ' + o.c + '"><span class="k">' + o.k + '</span><span class="x">' + o.x +
+        '</span><span class="k">' + o.sub + "</span></div>";
+    }).join("");
+  }
+
+  function renderHour() {
+    var r = res.rows[st.hr - 1], c = CFG[st.cfg];
+    $("hro").textContent = "час " + st.hr + " · " + (st.hr <= 24 ? "1-е" : "2-е") + " сутки";
+    $("hr").value = st.hr;
+    drawTank(r);
+    var used1 = r.stg ? r.stg.n1 : 0, used2 = r.stg ? r.stg.n2 : 0, html = [];
+    var down2 = r.unitDown && c.n2 > 0 ? 1 : 0, down1 = r.unitDown && c.n2 === 0 ? 1 : 0;
+    var addP = function (type, n, used, down) {
+      for (var i = 0; i < n; i++) {
+        var state, cls;
+        if (i < down) { state = "отказ"; cls = "fail"; }
+        else if (r.outFrac >= 1) { state = "нет питания"; cls = "off"; }
+        else if (i - down < used) { state = r.pumped < r.cap - 0.5 ? "циклы" : "работает"; cls = "run"; }
+        else { state = "резерв"; cls = "off"; }
+        html.push('<span class="pump ' + cls + '">' + type + " №" + (i + 1) + " · " + state + "</span>");
+      }
+    };
+    addP("P2", c.n2, used2, down2);
+    addP("P1", c.n1, used1, down1);
+    $("pumps").innerHTML = html.join("");
+    var rows = [
+      ["Приток", fmt(r.inflow) + " м³/ч"], ["Подача ступени", r.stg ? fmt(r.stg.Q) + " м³/ч" : "0"],
+      ["Откачано за час", fmt(r.pumped) + " м³"], ["Напор", r.stg ? fmt(r.stg.H, 1) + " м" : "—"],
+      ["Объём на конец часа", fmt(r.v) + " м³"], ["Уровень от дна", fmt((VSL + VDEAD + r.v) / (res.vfull / 4.5), 2) + " м"]
+    ];
+    $("now").innerHTML = rows.map(function (x) { return "<div><span>" + x[0] + "</span><b>" + x[1] + "</b></div>"; }).join("");
+    drawCursor();
+  }
+
+  // ---------- разрез накопителя (по высоте в масштабе, глубина 4,5 м)
+  function drawTank(r) {
+    var svg = $("tank"), x0 = 30, w = 120, top = 20, hgt = 330, vfull = res.vfull;
+    var y = function (vol) { return top + hgt - vol / vfull * hgt; };
+    var zones = [
+      [0, VSL, css("--sludge"), "Осадок 400 м³"],
+      [VSL, VSL + VDEAD, css("--dead"), "Недоступный 200 м³"],
+      [VSL + VDEAD, VSL + VDEAD + st.vu, css("--water-soft"), "Полезный " + fmt(st.vu) + " м³"],
+      [VSL + VDEAD + st.vu, vfull, css("--free"), "Борт 15 %"]
+    ];
+    var s = "";
+    zones.forEach(function (z) {
+      s += '<rect x="' + x0 + '" y="' + y(z[1]) + '" width="' + w + '" height="' + Math.max(0, y(z[0]) - y(z[1])) +
+        '" fill="' + z[2] + '"/>';
+    });
+    var wl = Math.min(vfull, VSL + VDEAD + r.v);
+    s += '<rect x="' + x0 + '" y="' + y(wl) + '" width="' + w + '" height="' + Math.max(0, y(VSL + VDEAD) - y(wl)) +
+      '" fill="' + css("--water") + '" opacity="0.85"><title>Вода</title></rect>';
+    s += '<rect x="' + x0 + '" y="' + top + '" width="' + w + '" height="' + hgt + '" fill="none" stroke="' + css("--ink") + '" stroke-width="2"/>';
+    var marks = [
+      [VSL + VDEAD, "Стоп", css("--muted")], [VSL + VDEAD + L2, "Пуск 2", css("--amber")],
+      [VSL + VDEAD + 0.9 * st.vu, "Авария", css("--danger")], [VSL + VDEAD + st.vu, "Верх полезного", css("--danger")]
+    ];
+    marks.forEach(function (m) {
+      var yy = y(m[0]);
+      s += '<line x1="' + (x0 - 6) + '" x2="' + (x0 + w + 6) + '" y1="' + yy + '" y2="' + yy + '" stroke="' + m[2] + '" stroke-dasharray="4 3" stroke-width="1.5"/>';
+      s += '<text x="' + (x0 + w + 10) + '" y="' + (yy + 4) + '" font-size="11" fill="' + m[2] + '">' + m[1] + " " + fmt(m[0] / vfull * 4.5, 2) + " м</text>";
+    });
+    s += '<text x="' + (x0 + w / 2) + '" y="' + (top + hgt + 22) + '" font-size="12" text-anchor="middle" fill="' + css("--ink") + '">V = ' + fmt(r.v) + " м³</text>";
+    var arrow = r.inflow - r.pumped;
+    s += '<text x="' + (x0 + w / 2) + '" y="' + (y(wl) - 6) + '" font-size="12" text-anchor="middle" fill="' + css("--ink") + '">' +
+      (arrow > 1 ? "▲ +" + fmt(arrow) : (arrow < -1 ? "▼ " + fmt(arrow) : "■ 0")) + " м³/ч</text>";
+    if (r.v > st.vu + res.vfb) s += '<text x="' + (x0 + w / 2) + '" y="' + (top - 6) + '" font-size="13" font-weight="700" text-anchor="middle" fill="' + css("--danger") + '">ПЕРЕЛИВ</text>';
+    s += '<text x="4" y="' + (top + 10) + '" font-size="10" fill="' + css("--muted") + '">4,5 м</text>';
+    s += '<text x="4" y="' + (top + hgt) + '" font-size="10" fill="' + css("--muted") + '">0</text>';
+    svg.innerHTML = s;
+  }
+
+  // ---------- графики
+  function prep(cv) {
+    var dpr = window.devicePixelRatio || 1, h = parseInt(cv.dataset.h || cv.getAttribute("height"), 10);
+    cv.dataset.h = h;
+    var w = Math.max(240, Math.floor(cv.parentElement.getBoundingClientRect().width - 32));
+    cv.style.width = w + "px"; cv.style.height = h + "px";
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    var ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx: ctx, w: w, h: h };
+  }
+  var geo = {};
+  function axes(g, ymax, step, unit) {
+    var L = 52, R = 10, T = 22, B = 24, ctx = g.ctx;
+    var X = function (h) { return L + (h - 0.5) / HOURS * (g.w - L - R); };
+    var Y = function (v) { return T + (1 - v / ymax) * (g.h - T - B); };
+    ctx.font = "11px " + css("--font-num"); ctx.fillStyle = css("--muted"); ctx.strokeStyle = css("--line"); ctx.lineWidth = 1;
+    for (var v = 0; v <= ymax + 0.1; v += step) {
+      ctx.beginPath(); ctx.moveTo(L, Y(v)); ctx.lineTo(g.w - R, Y(v)); ctx.stroke();
+      ctx.textAlign = "right"; ctx.fillText(fmt(v), L - 6, Y(v) + 4);
+    }
+    ctx.textAlign = "center";
+    for (var h = 0; h <= HOURS; h += 6) ctx.fillText(String(h), X(h + 0.5), g.h - 6);
+    ctx.textAlign = "left"; ctx.fillText(unit, 4, 11);
+    // зона события
+    var ev = [];
+    if (st.ot > 0) ev.push([st.t0, st.t0 + st.ot]);
+    if (st.uf) ev.push([st.t0, st.t0 + st.rep]);
+    ctx.fillStyle = css("--amber"); ctx.globalAlpha = 0.12;
+    ev.forEach(function (e) { ctx.fillRect(X(e[0]), T, X(e[1]) - X(e[0]), g.h - T - B); });
+    ctx.globalAlpha = 1;
+    return { X: X, Y: Y, L: L, R: R, T: T, B: B };
+  }
+  function line(ctx, pts, color, width, dash) {
+    ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []);
+    pts.forEach(function (p, i) { if (i) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); });
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+  function drawCharts() {
+    var rows = res.rows;
+    var g1 = prep($("cf"));
+    var fmax = Math.max(1600, Math.ceil(Math.max.apply(null, rows.map(function (r) { return Math.max(r.inflow, r.cap); })) / 400) * 400);
+    if (res.slim > fmax) fmax = Math.ceil(res.slim / 500) * 500;
+    var a1 = axes(g1, fmax, fmax > 2000 ? 1000 : 400, "м³/ч");
+    var stepPts = function (key) {
+      var pts = [];
+      rows.forEach(function (r) { pts.push([a1.X(r.h - 0.5), a1.Y(r[key])]); pts.push([a1.X(r.h + 0.5), a1.Y(r[key])]); });
+      return pts;
+    };
+    line(g1.ctx, [[a1.L, a1.Y(res.slim)], [g1.w - a1.R, a1.Y(res.slim)]], css("--amber"), 1.5, [5, 4]);
+    line(g1.ctx, stepPts("inflow"), css("--ink"), 2);
+    line(g1.ctx, stepPts("pumped"), css("--water"), 2.5);
+    geo.f = { g: g1, a: a1 };
+
+    var g2 = prep($("cv"));
+    var top = Math.max(st.vu + res.vfb, res.vmax) * 1.08;
+    var stp = top > 4000 ? 1000 : 500;
+    var a2 = axes(g2, Math.ceil(top / stp) * stp, stp, "м³");
+    var ctx = g2.ctx;
+    ctx.beginPath(); ctx.moveTo(a2.X(0.5), a2.Y(0));
+    rows.forEach(function (r) { ctx.lineTo(a2.X(r.h + 0.5), a2.Y(r.v)); });
+    ctx.lineTo(a2.X(HOURS + 0.5), a2.Y(0)); ctx.closePath();
+    ctx.fillStyle = css("--water"); ctx.globalAlpha = 0.18; ctx.fill(); ctx.globalAlpha = 1;
+    line(ctx, [[a2.X(0.5), a2.Y(0)]].concat(rows.map(function (r) { return [a2.X(r.h + 0.5), a2.Y(r.v)]; })), css("--water"), 2.5);
+    line(ctx, [[a2.L, a2.Y(st.vu)], [g2.w - a2.R, a2.Y(st.vu)]], css("--danger"), 1.5, [6, 4]);
+    line(ctx, [[a2.L, a2.Y(st.vu + res.vfb)], [g2.w - a2.R, a2.Y(st.vu + res.vfb)]], css("--muted"), 1, [2, 3]);
+    geo.v = { g: g2, a: a2 };
+    snap = { f: g1.ctx.getImageData(0, 0, $("cf").width, $("cf").height), v: ctx.getImageData(0, 0, $("cv").width, $("cv").height) };
+  }
+  var snap = null;
+  function drawCursor() {
+    if (!snap) return;
+    [["f", "cf"], ["v", "cv"]].forEach(function (p) {
+      var G = geo[p[0]], ctx = G.g.ctx;
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.putImageData(snap[p[0]], 0, 0); ctx.restore();
+      var x = G.a.X(st.hr + 0.5);
+      line(ctx, [[x, G.a.T], [x, G.g.h - G.a.B]], css("--ink"), 1, [3, 3]);
+    });
+  }
+
+  buildControls();
+  Object.keys(PRESETS[1].s).forEach(function (k) { st[k] = PRESETS[1].s[k]; });
+  syncInputs();
+  render();
+  var rt, lastW = 0;
+  var onResize = function () {
+    var w = document.querySelector(".charts").getBoundingClientRect().width;
+    if (Math.abs(w - lastW) < 2) return;
+    lastW = w; clearTimeout(rt); rt = setTimeout(render, 80);
+  };
+  try { new ResizeObserver(onResize).observe(document.querySelector(".charts")); }
+  catch (e) { window.addEventListener("resize", onResize); }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(render);
+  try { window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", render); } catch (e) {}
+  new MutationObserver(render).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  window.SIM = { simulate: function () { return simulate(); }, st: st, render: render };
+})();
+</script>
